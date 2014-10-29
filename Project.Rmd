@@ -1,22 +1,127 @@
 ---
-title: "Project"
+title: "Course Project : Practical Machine Learning"
 author: "Joanne Antonetti"
 date: "26 octobre 2014"
 output: html_document
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+### Summary of the problem
+> Question: What is the class (A, B, C, D, E) of a sample?
+
+Input Data: 
+- 19622 samples
+- 159 predictors
+- 5 classes
+
+
+
+### 1) Data Preparation
+#### Data loading
+```{r}
+training <- read.csv("pml-training.csv", na.strings= c(" ", "NA",""))
+testing <- read.csv("pml-testing.csv", na.strings= c("NA",""," "))
+```
 
 ```{r}
-summary(cars)
+dim(training) 
 ```
 
-You can also embed plots, for example:
-
-```{r, echo=FALSE}
-plot(cars)
+```{r}
+dim(testing) 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#### Data Cleaning of the testing and training set
+We remove the variables with the NA values.
+```{r}
+training_clean <- training[ , colSums(is.na(training)) == 0]
+testing_clean <- testing[ , colSums(is.na(testing)) == 0]
+```
+
+```{r}
+dim(training_clean) 
+```
+
+```{r}
+dim(testing_clean)
+```
+  
+We remove the variables which are not relevant for this analysis.
+```{r}
+training_clean <- training_clean[,8:60]
+testing_clean <- testing_clean[,8:60]
+```
+
+```{r}
+dim(training_clean) 
+```
+
+```{r}
+dim(testing_clean) 
+```
+
+
+
+### 2) The Model  
+#### Data splitting
+We split data into training and testing subset for cross validation. 
+```{r}
+library(caret)
+library(lattice)
+library(ggplot2)
+set.seed(32323)
+inTrain = createDataPartition(y=training_clean$classe, p=0.75, list=FALSE)
+training_train = training_clean[inTrain,]
+training_test = training_clean[-inTrain,]
+```  
+
+
+#### Training
+We choose a type of model on the training set.
+```{r}
+library(randomForest)
+set.seed(121212)
+modFit <- randomForest(classe~.,data=training_train,importance=TRUE)
+print(modFit)
+``` 
+
+
+#### Prediction on testing to evaluate the model : Out of Sample Error
+The expected **Out of Sample Error** is estimated by the error rate on the test subset, that is  *1 - Accuracy = 0.0047*
+```{r}
+predictions <- predict(modFit, newdata=training_test)
+confMatrix <- confusionMatrix(predictions, training_test$classe)
+print(confMatrix)
+``` 
+
+
+#### Matrix representing the importance of the predictors 
+```{r}
+varImpPlot(modFit, main="Variable Importance")
+``` 
+
+
+
+###  3) Prediction on the testing set
+#### Prediction
+```{r}
+answers <- predict (modFit, testing_clean)
+print(answers)
+``` 
+
+
+#### Generating Answers Files to Submit for Assignment
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(answers)
+```
+
